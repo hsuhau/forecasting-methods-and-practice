@@ -1,6 +1,6 @@
 ---
 title: "预测：方法与实践 3 预测者的工具集"
-output: word_document
+output: html_document
 ---
 
 ## 第三章 预测者的工具集

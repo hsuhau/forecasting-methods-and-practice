@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.10" project-jdk-type="Python SDK" />
   <component name="RMarkdownSettings">
     <option name="renderProfiles">
       <map>
@@ -59,6 +60,21 @@
           <value>
             <RMarkdownRenderProfile>
               <option name="lastOutput" value="$PROJECT_DIR$/notebooks/Chapter-3-The-forecaster’s-toolbox.docx" />
+              <option name="outputDirectoryUrl" value="file://$PROJECT_DIR$/notebooks" />
+            </RMarkdownRenderProfile>
+          </value>
+        </entry>
+        <entry key="file://$PROJECT_DIR$/notebooks/Chapter-5-Time-series-regression-models.rmd">
+          <value>
+            <RMarkdownRenderProfile>
+              <option name="lastOutput" value="$PROJECT_DIR$/notebooks/Chapter-5-Time-series-regression-models.html" />
+              <option name="outputDirectoryUrl" value="file://$PROJECT_DIR$/notebooks" />
+            </RMarkdownRenderProfile>
+          </value>
+        </entry>
+        <entry key="file://$PROJECT_DIR$/notebooks/excel.rmd">
+          <value>
+            <RMarkdownRenderProfile>
               <option name="outputDirectoryUrl" value="file://$PROJECT_DIR$/notebooks" />
             </RMarkdownRenderProfile>
           </value>

@@ -1,6 +1,6 @@
 ---
 title: "预测：方法与实践 0 引言"
-output: word_document
+output: html_document
 ---
 
 ## 引言
