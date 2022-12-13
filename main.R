@@ -24,6 +24,6 @@ pkgs <- c(
   "viridisLite",
   "whisker",
   "xml2", "xtable",
-  "yaml"
-)
+  "yaml",
+"sf","terra","spData","spDataLarge", repos = "https://nowosad.r-universe.dev")
 install.packages(unique(pkgs))

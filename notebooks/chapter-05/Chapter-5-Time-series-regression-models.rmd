@@ -1,0 +1,447 @@
+---
+title: "第 5 章 时间序列回归模型"
+output: html_document
+---
+
+# 第 5 章 时间序列回归模型[](https://otexts.com/fppcn/regression-cn.html#regression-cn)
+
+在本章节我们将会讨论时间序列的线性回归模型。线性回归模型的核心思路是：我们预测时间序列 y 时假设它与其它时间序列 x 之间存在线性关系。
+
+例如，我们可以通过广告总花费 x 来预测月度销量 y；同样的，我们可以通过气温数据 x1 和星期数据 x2 来预测日耗电量 y。
+
+**被预测变量** y 有时还称作回归变量、因变量或被解释变量。**预测变量** x 有时也叫作回归量、自变量或解释变量。在本书中我们称它们为“被预测变量”和“预测变量”。
+```{r}
+library(fpp2)
+library(forecast)
+```
+
+5.1 线性模型[](https://otexts.com/fppcn/regression-intro.html#regression-intro)
+
+### 简单线性回归[](https://otexts.com/fppcn/regression-intro.html#%E7%AE%80%E5%8D%95%E7%BA%BF%E6%80%A7%E5%9B%9E%E5%BD%92)
+
+最简单的线性回归模型假设被预测变量 y 和单个预测变量 x 之间存在如下线性关系：
+$$
+y_t = \beta_0 + \beta_1 x_t + \varepsilon_t.
+$$
+
+图 [5.1](https://otexts.com/fppcn/regression-intro.html#fig:SLRpop1) 为示例数据在线性模型上的拟合结果。其中，系数 $\beta_0$ 和 $\beta_1$ 分别表示回归线的截距和斜率。截距项 β0 表示当 x=0 时 y 的预测值；斜率 β1 表示当 x 增加一个单位时，y 的平均变化。
+
+![示例数据在简单线性模型上的回归结果。](https://otexts.com/fppcn/fpp_files/figure-html/SLRpop1-1.png)
+
+图 5.1: 示例数据在简单线性模型上的回归结果。
+
+从上图可以看出，观测值并不全部落在回归线上，而是分布在回归线的周围。我们可以这样理解：每个观测值 yt 都包含可解释部分 $\beta_0+\beta_1x_t$ 和随机误差项 $\varepsilon_t$。随机误差项并不意味着错误，而是指观测值与线性模型的偏差。它捕捉到了除 $x_t$ 外其他影响 $y_t$ 的信息。
+
+#### 示例：美国的消费支出[](https://otexts.com/fppcn/regression-intro.html#%E7%A4%BA%E4%BE%8B%E7%BE%8E%E5%9B%BD%E7%9A%84%E6%B6%88%E8%B4%B9%E6%94%AF%E5%87%BA)
+
+图[5.2](https://otexts.com/fppcn/regression-intro.html#fig:ConsInc)展示了1970年第一季度到2016年第三季度之间，美国实际个人消费支出 y 和实际个人可支配收入 x 的季度增长情况。
+
+```{r}
+cbind('消费' = uschange[, "Consumption"],
+      '收入' = uschange[, "Income"]) %>%
+  autoplot(facets = TRUE, colour=TRUE) +
+  ylab("增长率 % ") + xlab("年份") +
+    theme(text = element_text(family = "STHeiti"))
+```
+
+
+图 5.2: 美国实际个人消费支出和实际个人可支配收入的增长情况。
+
+图[5.3](https://otexts.com/fppcn/regression-intro.html#fig:ConsInc2)表明了消费变化与收入变化的散点图，估计的回归线为：$\hat{y}_t=0.55 + 0.28x_t.$（我们在 y 头上加一个‘帽’，表示为 $hat{y}$ ,这表示模型对 y 的预测值。）
+
+```{r}
+uschange %>%
+  as.data.frame() %>%
+  ggplot(aes(x=Income, y=Consumption)) +
+    ylab("季度消费支出变化 %") +
+    xlab("季度收入变化 %") +
+    geom_point() +
+    geom_smooth(method="lm", se=FALSE)+
+    theme(text = element_text())+
+    theme(plot.title = element_text(hjust = 0.5))
+#> `geom_smooth()` using formula 'y ~ x'
+```
+
+![季度消费支出变化与个人收入变化的拟合回归线和散点图。](https://otexts.com/fppcn/fpp_files/figure-html/ConsInc2-1.png)
+
+图 5.3: 季度消费支出变化与个人收入变化的拟合回归线和散点图。
+
+在R中，可以使用 `tslm()` 函数对模型进行估计：
+
+```{r}
+tslm(Consumption ~ Income, data=uschange)
+#>
+#> Call:
+#> tslm(formula = Consumption ~ Income, data = uschange)
+#>
+#> Coefficients:
+#> (Intercept)       Income
+#>       0.545        0.281
+```
+
+在[5.2](https://otexts.com/fppcn/least-squares.html#least-squares)中，我们会详细阐述 `tslm()` 计算参数的原理。
+
+拟合出的回归线斜率为正，反映了收入与消费之间的正相关关系。斜率系数表明，x 每增加一个单位（个人可支配收入增加1个百分点），会导致 y 平均增加0.28 个单位（个人消费支出平均增加0.28 个百分点）。或者说，当 x （个人可支配收入增长百分比）为1时，y（个人消费支出增长百分比）为 0.55+0.28×1=0.83。
+
+截距项即为 x=0 时 y 的值。在本例中，当 x=0（即个人可支配收入没有变化）时，y 的预测值为0.55（个人消费支出平均增加0.55%）。虽然 x=0 时没有意义，但截距项仍然是模型中的非常重要的一部分。假如模型中没有截距项，斜率系数很可能是一个错误的估计值。除非强制要求回归线通过原点，否则模型中应始终包含截距项。下面我们假设模型中总是包含截距项。
+
+### 多元线性回归[](https://otexts.com/fppcn/regression-intro.html#%E5%A4%9A%E5%85%83%E7%BA%BF%E6%80%A7%E5%9B%9E%E5%BD%92)
+
+当预测变量有两个甚至更多时，模型被称为**多元线性回归模型**。多元线性回归模型的一般形式如下：
+$$
+\begin{equation}
+  y_t = \beta_{0} + \beta_{1} x_{1,t} + \beta_{2} x_{2,t} + \cdots + \beta_{k} x_{k,t} + \varepsilon_t,
+  \tag{5.1}
+\end{equation}
+$$
+
+其中，y 是被预测变量， $x_{1},\dots,x_{k}$ 是 k 个预测变量，每个预测变量都必须为数值型变量。系数 $\beta_{1},\dots,\beta_{k}$ 分别衡量了在保持其他所有预测变量不变的情况下，该预测变量对被预测变量的影响程度。因此，系数衡量了对应预测变量对被预测变量的*边际影响*。
+
+#### 示例：美国的消费支出[](https://otexts.com/fppcn/regression-intro.html#%E7%A4%BA%E4%BE%8B%E7%BE%8E%E5%9B%BD%E7%9A%84%E6%B6%88%E8%B4%B9%E6%94%AF%E5%87%BA-1)
+
+图[5.4](https://otexts.com/fppcn/regression-intro.html#fig:MultiPredictors)显示了可用于预测美国消费支出的其他预测变量。这些预测变量包括工业产出和个人储蓄的季度变化百分比，以及失业率的季度变化。由于我们预测消费支出时不仅考虑了个人收入，还考虑了其他预测变量，因此建立多元线性回归模型可能会产生更准确的预测结果。
+
+![1970年第一季度到2016年第三季度之间，工业生产和个人储蓄的季度变化百分比以及失业率的季度变化情况。](https://otexts.com/fppcn/fpp_files/figure-html/MultiPredictors-1.png)
+
+图 5.4: 1970年第一季度到2016年第三季度之间，工业生产和个人储蓄的季度变化百分比以及失业率的季度变化情况。
+
+图[5.5](https://otexts.com/fppcn/regression-intro.html#fig:ScatterMatrix)是五个变量的散点图矩阵。其中，第一列显示了被预测变量（消费）与其他预测变量的关系。该图表明，居民收入与工业生产产值存在正相关关系，与储蓄和失业率存在负相关关系。相关关系的强度由相关系数来表示。其余的散点图和相关系数表明各个预测变量之间的关系。
+
+```{r}
+uschange %>%
+  as.data.frame() %>%
+  GGally::ggpairs()
+```
+
+![美国消费支出和预测变量的散点图矩阵。](https://otexts.com/fppcn/fpp_files/figure-html/ScatterMatrix-1.png)
+
+图 5.5: 美国消费支出和预测变量的散点图矩阵。
+
+### 假设条件[](https://otexts.com/fppcn/regression-intro.html#%E5%81%87%E8%AE%BE%E6%9D%A1%E4%BB%B6)
+
+当我们想要使用线性回归模型（式[(5.1)](https://otexts.com/fppcn/regression-intro.html#eq:lm)）时，需要对变量做出一些基本假设。
+
+首先，我们假设线性模型是对现实情况的合理近似；也就是说，预测变量和被预测变量之间的关系基本满足这个线性方程。
+
+其次，我们对误差项 $(\varepsilon_{1},\dots,\varepsilon_{T})$ 做出如下假设：
+
+- 期望为零；否则预测结果会产生系统性偏差。
+- 随机误差项彼此不相关；否则预测效果会很差，因为这表明数据中尚有很多可用信息没有包含在模型中。
+- 与预测变量不相关；若误差项与预测变量相关，则表明模型的系统部分中应该包含更多信息。
+
+为了方便得到预测区间，我们还需要假设随机误差项服从方差为 $\sigma^2$ 的正态分布。
+
+线性回归模型还有一个重要的假设是预测变量 x 不是随机变量。在进行模拟实验时，我们可以控制每个 x 的值（所以 x 不会是随机的）并观察 y 的结果值。但在实际生活中，我们只能得到观察数据（包括商业和经济学中的大多数数据），而不能控制 x 的值。因此，我们需要做出如上假设。
+
+
+## 5.2 最小二乘估计[](https://otexts.com/fppcn/least-squares.html#least-squares)
+
+在实际问题中，我们有一系列的观察值，但是我们不知道模型系数 $\beta_0,\beta_1, \dots, \beta_k$ 的具体值。因此，我们需要利用模型对这些参数进行估计。
+
+最小二乘估计方法通过最小化残差平方和来确定模型的各个参数。也就是说，我们通过最小化下式来确定 $\beta_0,\beta_1, \dots, \beta_k$ 的估计值：
+
+$$
+\sum_{t=1}^T \varepsilon_t^2 = \sum_{t=1}^T (y_t -
+  \beta_{0} - \beta_{1} x_{1,t} - \beta_{2} x_{2,t} - \cdots - \beta_{k} x_{k,t})^2.
+$$
+
+由于它的目标是最小化残差平方和，因此被称为**最小二乘估计**。寻找最优参数的过程，一般被称为“拟合”模型，或者被称为模型的“学习”或者“训练”。图[5.3](https://otexts.com/fppcn/regression-intro.html#fig:ConsInc2)中的拟合线就是通过该方法得到的。
+
+参数的估计值，一般用 ^β0,…,^βk 来表示。相关方程在[5.7](https://otexts.com/fppcn/regression-matrices.html#regression-matrices)节中会详细阐述。
+
+`tslm()`函数可以将时间序列数据拟合到线性回归模型中。它和广泛用于线性模型的`lm()`函数非常相似，但不同的是`tslm()`函数可用于时间序列数据。
+
+#### 示例：美国消费支出[](https://otexts.com/fppcn/least-squares.html#%E7%A4%BA%E4%BE%8B%E7%BE%8E%E5%9B%BD%E6%B6%88%E8%B4%B9%E6%94%AF%E5%87%BA)
+
+美国消费的多元线性回归模型为：
+$$
+y_t=\beta_0 + \beta_1 x_{1,t}+ \beta_2 x_{2,t}+ \beta_3 x_{3,t}+ \beta_4 x_{4,t}+\varepsilon_t,
+$$
+其中， y 是实际个人消费支出的百分比变化， x1 是实际个人可支配收入的百分比变化， x2 是工业产值的百分比变化， x3 是个人储蓄的百分比变化， x4 是失业率的变化。
+
+以下是关于拟合模型的一些信息。`Coefficients`的第一列是每个 β 的估计值，第二列是估计值的标准误差（通过重复估计类似数据集上的 β 系数可以获得标准差）。标准误差是 β 的不确定性度量。
+
+```{r}
+fit.consMR <- tslm(Consumption ~ Income + Production + Unemployment + Savings,
+  data=uschange)
+summary(fit.consMR)
+#> 
+#> Call:
+#> tslm(formula = Consumption ~ Income + Production + Unemployment + 
+#>     Savings, data = uschange)
+#> 
+#> Residuals:
+#>     Min      1Q  Median      3Q     Max 
+#> -0.8830 -0.1764 -0.0368  0.1525  1.2055 
+#> 
+#> Coefficients:
+#>              Estimate Std. Error t value Pr(>|t|)    
+#> (Intercept)   0.26729    0.03721    7.18  1.7e-11 ***
+#> Income        0.71448    0.04219   16.93  < 2e-16 ***
+#> Production    0.04589    0.02588    1.77    0.078 .  
+#> Unemployment -0.20477    0.10550   -1.94    0.054 .  
+#> Savings      -0.04527    0.00278  -16.29  < 2e-16 ***
+#> ---
+#> Signif. codes:  
+#> 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+#> 
+#> Residual standard error: 0.329 on 182 degrees of freedom
+#> Multiple R-squared:  0.754,  Adjusted R-squared:  0.749 
+#> F-statistic:  139 on 4 and 182 DF,  p-value: <2e-16
+```
+
+对于预测来说，我们并不是特别关心估计系数的 t 值和 p 值。 t 值是估计系数 β 与其标准误差的比值；估计结果的最后一列是 p 值，若消费支出和相关的预测变量没有显著的关系时， p 值将会很大。这在检验及研究各预测变量对被预测变量是否有显著影响时很有用，但对于预测本身并不特别有用。
+
+### 拟合值[](https://otexts.com/fppcn/least-squares.html#%E6%8B%9F%E5%90%88%E5%80%BC-1)
+
+我们可以利用回归方程中的估计系数并将误差项设置为零来预测 y 。我们通常将模型写成如下形式：
+$$
+\begin{equation}
+  \hat{y}_t = \hat\beta_{0} + \hat\beta_{1} x_{1,t} + \hat\beta_{2} x_{2,t} + \cdots + \hat\beta_{k} x_{k,t}.
+  \tag{5.2}
+\end{equation}
+$$
+将训练样本中 $x_{1,t},\ldots,x_{k,t}$ （其中 t=1,…,T ）的值代入模型中，我们将会得到 $y_t$ 的预测值，即为模型的*拟合值*。需要注意的是，这是模型估计得到的训练样本的预测值，而不是 y 未来真实值的预测值。
+
+下图是美国消费支出百分比变化的拟合值与真实值的比较。图[5.6](https://otexts.com/fppcn/least-squares.html#fig:usfitted1)中的时间序列图表明拟合值非常接近实际数据。这一点可以通过散点图[5.7](https://otexts.com/fppcn/least-squares.html#fig:usfitted2)中显示的明显的正相关关系来验证。
+
+```{r}
+autoplot(uschange[,'Consumption'], series="真实值") +
+  autolayer(fitted(fit.consMR), series="拟合值") +
+  xlab("年份") + ylab("") +
+  ggtitle("美国消费支出的百分比变化") +
+  theme(text = element_text(family = "STHeiti"))+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+![美国消费支出真实值与拟合值的时间序列图。](https://otexts.com/fppcn/fpp_files/figure-html/usfitted1-1.png)
+
+图 5.6: 美国消费支出真实值与拟合值的时间序列图。
+
+```{r}
+cbind(Data=uschange[,"Consumption"], Fitted=fitted(fit.consMR)) %>%
+  as.data.frame() %>%
+  ggplot(aes(x=Data, y=Fitted)) +
+    geom_point() +
+    xlab("拟合值（预测值）") +
+    ylab("真实值") +
+    ggtitle("美国消费支出的百分比变化") +
+    geom_abline(intercept=0, slope=1)+
+    theme(text = element_text(family = "STHeiti"))+
+    theme(plot.title = element_text(hjust = 0.5))
+```
+
+![美国消费支出真实值与拟合值的关系图。](https://otexts.com/fppcn/fpp_files/figure-html/usfitted2-1.png)
+
+图 5.7: 美国消费支出真实值与拟合值的关系图。
+
+### 拟合优度[](https://otexts.com/fppcn/least-squares.html#%E6%8B%9F%E5%90%88%E4%BC%98%E5%BA%A6)
+
+一般用可决系数（$R^2$）评价线性回归模型对数据的拟合程度。它可以通过计算观测值 y 和预测值 ^y 之间的相关性来得出。或者，通过下式计算：
+$$
+R^2 = \frac{\sum(\hat{y}_{t} - \bar{y})^2}{\sum(y_{t}-\bar{y})^2},
+$$
+可决系数反映了回归模型所能解释的被预测变量的变异占被预测变量总变异的比例。
+
+在简单线性回归模型中， $R^2$ 也等于 y 和 x 的相关系数的平方（假设存在截距项）。
+
+预测值越接近于真实值， $R^2$ 则会越接近于1。相反，若预测值和真实值不相关，则 $R^2=0$ （假设存在截距项）。在其它情况下， $R^2$ 的值则会处在0和1之间。
+
+但是仅仅利用 $R^2$ 来衡量模型是远远不够的。因为当增加解释变量的个数时， $R^2$ 值将会不断增加，但这并不意味着更好的模型效果。目前并不存在衡量 $R^2$ 值好坏的规则， $R^2$ 值的有效性需要视具体情况而定。因此，利用模型在测试集上的预测结果来衡量模型好坏比直接根据 $R^2$ 大小来衡量模型更加有效。
+
+#### 示例：美国消费支出[](https://otexts.com/fppcn/least-squares.html#%E7%A4%BA%E4%BE%8B%E7%BE%8E%E5%9B%BD%E6%B6%88%E8%B4%B9%E6%94%AF%E5%87%BA-1)
+
+图[5.7](https://otexts.com/fppcn/least-squares.html#fig:usfitted2)绘制了实际消费支出与拟合值的关系曲线。变量之间的相关系数为 $r=0.868$ ， $R^2=0.754$ 。从 $R^2$ 值来看，该模型的拟合效果较好，模型可以解释消费支出75.4%的变异。而[5.1](https://otexts.com/fppcn/regression-intro.html#regression-intro)节中，利用简单回归模型对数据进行拟合，结果显示其 $R^2$ 值为0.16。因此，添加三个额外的预测变量可以使模型解释消费数据中更多的变化。
+
+### 回归的标准误差[](https://otexts.com/fppcn/least-squares.html#%E5%9B%9E%E5%BD%92%E7%9A%84%E6%A0%87%E5%87%86%E8%AF%AF%E5%B7%AE)
+
+另外一个衡量模型拟合效果的指标是残差的标准偏差，通常称之为“残差标准误差”。在上例中，模型的残差标准误差为0.329。它可以通过下式来计算：
+
+$$
+\begin{equation}
+  \hat{\sigma}_e=\sqrt{\frac{1}{T-k-1}\sum_{t=1}^{T}{e_t^2}},
+  \tag{5.3}
+\end{equation}
+$$
+其中， k 是模型中预测变量的个数。需要注意的是，由于需要估计的参数个数为 k+1 （截距项和 k 个解释变量），因此上式中分母为 T−k−1 。
+
+模型的标准误差和平均误差有一定联系。我们可以将标准误与 y 的均值或标准差做对比，得到一些关于模型精度的结论。
+
+在生成被预测变量的预测区间时，标准误差将十分有用。我们会在[5.6](https://otexts.com/fppcn/forecasting-regression.html#forecasting-regression)节中详细讨论该内容。
+
+
+## 5.3 回归模型的评估[](https://otexts.com/fppcn/regression-evaluation.html#regression-evaluation)
+
+拟合值 ^y 和实际观测值 y 之间的差值被称为训练误差或“残差”，其表达式如下：et=yt−^yt=yt−^β0−^β1x1,t−^β2x2,t−⋯−^βkxk,t其中 t=1,…,T 。每个残差都是观测值中不可预测的部分。
+
+残差项有两个非常有用的性质：T∑t=1et=0andT∑t=1xk,tet=0for all k.从以上两式可以明显看出：残差的均值为零；残差项和预测变量之间相关性为零。（当模型中没有截距项时，零相关假设不一定成立。）
+
+在选择回归变量并拟合回归模型之后，有必要绘制残差图以检查模型的假设是否已经满足。此外应该生成一系列图表，以检查拟合模型的不同方面和基本假设是否成立。下面我们将逐个分析。
+
+### 残差的自相关函数（ACF）图[](https://otexts.com/fppcn/regression-evaluation.html#%E6%AE%8B%E5%B7%AE%E7%9A%84%E8%87%AA%E7%9B%B8%E5%85%B3%E5%87%BD%E6%95%B0acf%E5%9B%BE)
+
+对于时间序列数据而言，在当前时间段观测到的变量值很可能与历史时段的变量值很相似。因此，当采用回归模型拟合时间序列数据时，残差经常会出现自相关效应。此时，模型违背了残差中无序列自相关的假设，并会导致模型的预测效率低下。为了获得更为准确的预测值，在模型中应该考虑更多的信息。当残差项存在序列自相关时，模型的预测结果仍然是无偏的，但此时得到预测区间范围通常会比我们需要的预测区间范围更大。因此我们应当重点关注模型残差的ACF图。
+
+另一个用于检验残差自相关的效果较好的检验方法是 **Breusch-Godfrey** 检验，也被称为 LM （拉格朗日乘数）检验。假如p值小于一个特定值（例如0.05），则表明残差中存在显著的自相关性。
+
+Breusch-Godfrey 检验类似于 Ljung-Box 检验，但它是专门用于回归模型的残差检验。
+
+### 残差直方图[](https://otexts.com/fppcn/regression-evaluation.html#%E6%AE%8B%E5%B7%AE%E7%9B%B4%E6%96%B9%E5%9B%BE)
+
+检查残差是否服从正态分布也是很有必要的。正如之前我们所解释的一样，它对预测值并不重要，但它可以让我们更加容易的确定预测区间。
+
+#### 示例[](https://otexts.com/fppcn/regression-evaluation.html#%E7%A4%BA%E4%BE%8B)
+
+使用[3.3](https://otexts.com/fppcn/residuals.html#residuals)节介绍的`checkresiduals()`函数，我们可以获得上述所有的残差诊断。
+
+```
+checkresiduals(fit.consMR)
+```
+
+![对美国季度消费支出回归模型的残差的分析。](https://otexts.com/fppcn/fpp_files/figure-html/uschangeresidcheck-1.png)
+
+图 5.8: 对美国季度消费支出回归模型的残差的分析。
+
+```
+#>
+#>  Breusch-Godfrey test for serial correlation of
+#>  order up to 8
+#>
+#> data:  Residuals from Linear regression model
+#> LM test = 15, df = 8, p-value = 0.06
+```
+
+图[5.8](https://otexts.com/fppcn/regression-evaluation.html#fig:uschangeresidcheck)是利用美国季度消费数据生成的多元回归模型的残差的时序图、 ACF 图和残差直方图。此外，还有 Breusch-Godfrey 检验的结果（`checkresiduals()`函数将使用 Breusch-Godfrey 检验进行回归模型，但 Ljung-Box 检验则不然）。
+
+时序图显示了不同时间下残差的变化，显然存在异方差性。这种异方差性会导致预测区间的不准确。
+
+残差直方图显示残差似乎略微左偏，这也可能影响预测区间的准确度。
+
+自相关图显示，在滞后7阶处存在一个明显的峰值。但这不足以使 Breusch-Godfrey 在5%显著性水平下显著。在其他滞后阶数的情况下，自相关性都不大。并且当滞后阶数为7时，它不会对预测值或预测区间产生较大影响。在第[9](https://otexts.com/fppcn/dynamic-cn.html#dynamic-cn)章中，我们会详细讨论用于更好的捕获残差中剩余信息的动态回归模型。
+
+### 预测变量与残差的关系图[](https://otexts.com/fppcn/regression-evaluation.html#%E9%A2%84%E6%B5%8B%E5%8F%98%E9%87%8F%E4%B8%8E%E6%AE%8B%E5%B7%AE%E7%9A%84%E5%85%B3%E7%B3%BB%E5%9B%BE)
+
+我们期望残差是随机分布的并且不显示任何规律，一个简单快捷的检验方法是查看每个预测变量与残差的散点图。如果这些散点图表现出明显的规律，则该关系可能是非线性的，并且需要相应地修改模型。[5.8](https://otexts.com/fppcn/nonlinear-regression.html#nonlinear-regression)节会详细的阐述非线性模型。
+
+此外，还需要对没有加入到模型中的预测变量绘制其与残差的散点图。如果某个残差图显示出明显的规律，则需要将对应的预测变量加入到模型之中（可能以非线性形式加入）。
+
+#### 示例[](https://otexts.com/fppcn/regression-evaluation.html#%E7%A4%BA%E4%BE%8B-1)
+
+图[5.9](https://otexts.com/fppcn/regression-evaluation.html#fig:resids)中表明，用于预测美国消费的多元回归模型的每个预测变量与残差之间都没有明显的相关关系。因此，模型较为理想。
+
+```{r}
+df <- as.data.frame(uschange)
+df[,"Residuals"]  <- as.numeric(residuals(fit.consMR))
+p1 <- ggplot(df, aes(x=Income, y=Residuals)) + geom_point() +
+  xlab("收入") + ylab("残差")+
+    theme(text = element_text(family = "STHeiti"))
+p2 <- ggplot(df, aes(x=Production, y=Residuals)) + geom_point()+
+  xlab("工业产出") + ylab("残差")+
+    theme(text = element_text(family = "STHeiti"))
+p3 <- ggplot(df, aes(x=Savings, y=Residuals)) + geom_point()+
+  xlab("个人储蓄") + ylab("残差")+
+    theme(text = element_text(family = "STHeiti"))
+p4 <- ggplot(df, aes(x=Unemployment, y=Residuals)) + geom_point()+
+  xlab("失业率") + ylab("残差")+
+    theme(text = element_text(family = "STHeiti"))
+gridExtra::grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+![各个预测变量与残差的关系图。](https://otexts.com/fppcn/fpp_files/figure-html/resids-1.png)
+
+图 5.9: 各个预测变量与残差的关系图。
+
+### 拟合值与残差的关系图[](https://otexts.com/fppcn/regression-evaluation.html#%E6%8B%9F%E5%90%88%E5%80%BC%E4%B8%8E%E6%AE%8B%E5%B7%AE%E7%9A%84%E5%85%B3%E7%B3%BB%E5%9B%BE)
+
+残差与拟合值之间也应没有明显规律。如果观察到明显规律，则残差中可能存在“异方差性”，这意味着残差的方差不是固定的。如果出现异方差性，可能需要对预测变量做对数或者平方根变换（参见第[3.2](https://otexts.com/fppcn/transformations.html#transformations)节）。
+
+#### 示例[](https://otexts.com/fppcn/regression-evaluation.html#%E7%A4%BA%E4%BE%8B-2)
+
+接上例，图[5.10](https://otexts.com/fppcn/regression-evaluation.html#fig:resids2)展示拟合值和残差的关系图。随机分布的散点图表示残差是同方差的。
+
+```
+cbind(Fitted = fitted(fit.consMR), Residuals=residuals(fit.consMR)) %>%
+  as.data.frame() %>%
+  ggplot(aes(x=Fitted, y=Residuals)) + geom_point() +
+  xlab('拟合值') + ylab('残差') +
+    theme(text = element_text(family = "STHeiti"))+
+    theme(plot.title = element_text(hjust = 0.5))
+```
+
+![残差对应于拟合值的散点图。](https://otexts.com/fppcn/fpp_files/figure-html/resids2-1.png)
+
+图 5.10: 残差对应于拟合值的散点图。
+
+### 异常值点和强影响点[](https://otexts.com/fppcn/regression-evaluation.html#%E5%BC%82%E5%B8%B8%E5%80%BC%E7%82%B9%E5%92%8C%E5%BC%BA%E5%BD%B1%E5%93%8D%E7%82%B9)
+
+与大多数数据相差甚远的点被称为“异常值点”。对模型的参数估计有重大影响的观测点被称为“强影响点”。通常情况下，强影响点在 x 方向也是极端的异常值。
+
+在本书的范围之外，有一些检测异常值点和强影响力点的方法。正如在第[2](https://otexts.com/fppcn/graphics-cn.html#graphics-cn)章中所讲的一样，在进行数据分析之前，先初步熟悉数据是非常关键的。画出 y 和 x 的散点图是回归分析的起点，并且可以帮助我们找出异常值。
+
+异常值的一个来源是不正确的数据录入。简单的数据描述性统计可以识别出异常的最小值和最大值。 如果识别出这样的观察结果，则应立即对样本进行校正或删除。
+
+当某些观测点完全不同时，也会出现异常值点。在这种情况下，将这些观测点全部删除是不可取的。如果观察结果已被确定为异常值，则必须对其进行研究并分析其背后的可能原因。删除或保留观察可能是一个艰难决定（特别是当异常值是有影响力的观察时）。因此，可以分别对删除观测值和保留观测值做分析。
+
+#### 示例[](https://otexts.com/fppcn/regression-evaluation.html#%E7%A4%BA%E4%BE%8B-3)
+
+图[5.11](https://otexts.com/fppcn/regression-evaluation.html#fig:outlier)着重表现了单个异常值对回归模型的影响（[5.1](https://otexts.com/fppcn/regression-intro.html#regression-intro)中介绍的例子）。在左图中，由于消费的百分比变化被错误的记作-4%，因此异常值点在 y 方向上出现极端值。红线是包含异常值的数据拟合的回归线，而黑线是没有包含异常值数据的回归线。在右图中，异常值点在 x 方向也出现极端值，即收入的变化率被错误的记作6%。我们可以很明显的看出，在这种情况下，异常值点极具影响力，导致红线大幅偏离黑线。
+
+![异常值点和强影响点对回归的影响。](https://otexts.com/fppcn/fpp_files/figure-html/outlier-1.png)
+
+图 5.11: 异常值点和强影响点对回归的影响。
+
+### 伪回归[](https://otexts.com/fppcn/regression-evaluation.html#%E4%BC%AA%E5%9B%9E%E5%BD%92)
+
+时间序列数据一般都是“不平稳的”；也就是说，时间序列数据没有固定的均值和方差。因此我们需要解决非平稳数据对回归模型的影响，在第[8](https://otexts.com/fppcn/arima-cn.html#arima-cn)章，我们会详细讨论时间序列的平稳性。在这里，我们需要强调非平稳数据对回归模型的影响。
+
+例如，图[5.12](https://otexts.com/fppcn/regression-evaluation.html#fig:spurious)中的两个变量，它们有着相同的向上增长的趋势，它们似乎有着强正相关关系。但实际上，澳大利亚航空客运量与几内亚水稻产量无关。
+
+![澳大利亚航空客运量对几内亚水稻产量的回归结果。](https://otexts.com/fppcn/fpp_files/figure-html/spurious-1.png)
+
+图 5.12: 澳大利亚航空客运量对几内亚水稻产量的回归结果。
+
+不平稳的时间序列会导致伪回归。图[5.13](https://otexts.com/fppcn/regression-evaluation.html#fig:tslmspurious2)展示了澳大利亚航空客运对与几内亚水稻产量的回归模型结果。伪回归的特点是高 R2 值和高残差自相关共存。我们将会在第[9](https://otexts.com/fppcn/dynamic-cn.html#dynamic-cn)章更加详细的讨论有关非平稳数据和伪回归问题。
+
+伪回归模型似乎可以给出合理的短期预测，但在长期时间中，伪回归是无效的。
+
+```
+aussies <- window(ausair, end=2011)
+fit <- tslm(aussies ~ guinearice)
+summary(fit)
+#>
+#> Call:
+#> tslm(formula = aussies ~ guinearice)
+#>
+#> Residuals:
+#>    Min     1Q Median     3Q    Max
+#> -5.945 -1.892 -0.327  1.862 10.421
+#>
+#> Coefficients:
+#>             Estimate Std. Error t value Pr(>|t|)
+#> (Intercept)    -7.49       1.20   -6.23  2.3e-07 ***
+#> guinearice     40.29       1.34   30.13  < 2e-16 ***
+#> ---
+#> Signif. codes:
+#> 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+#>
+#> Residual standard error: 3.24 on 40 degrees of freedom
+#> Multiple R-squared:  0.958,  Adjusted R-squared:  0.957
+#> F-statistic:  908 on 1 and 40 DF,  p-value: <2e-16
+```
+
+```
+checkresiduals(fit)
+```
+
+![伪回归的残差。](https://otexts.com/fppcn/fpp_files/figure-html/tslmspurious2-1.png)
+
+图 5.13: 伪回归的残差。
+
+```
+#>
+#>  Breusch-Godfrey test for serial correlation of
+#>  order up to 8
+#>
+#> data:  Residuals from Linear regression model
+#> LM test = 29, df = 8, p-value = 3e-04
+```

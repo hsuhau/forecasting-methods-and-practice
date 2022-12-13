@@ -10,10 +10,6 @@ position the caret at any line or the code chunk, then click "+".
 
 The code chunk appears:
 ```{r}
-retaildata <- readxl::read_excel("C:/Users/hsuhau/Desktop/Excel/预算导入需求开发.xls", skip = 1)
-myts <- ts(retaildata[, "A3349873A"], frequency = 12, start = c(1982, 4))
-myts.train <- window(myts, end = c(2010, 12))
-myts.test <- window(myts, start = 2011)
 ```
 
 Type any R code in the chunk, for example:
