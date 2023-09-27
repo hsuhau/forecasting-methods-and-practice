@@ -10,6 +10,17 @@ output: html_document
 
 ```{r}
 library(fpp2)
+library(forecast)
+library(extrafont)
+
+# 导入中文字体
+font_import(pattern = "simhei.ttf")  # simhei.ttf是中文字体的文件名，需要将其放在R工作目录下
+
+# 加载字体
+loadfonts(device = "win")
+
+# 设置字体
+Sys.setenv("font.family"="SimHei")
 ```
 
 ### 2.1 ts 对象

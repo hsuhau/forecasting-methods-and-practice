@@ -1,132 +1,22 @@
 ---
-title: "5.1 线性模型"
+title: "5.2 最小二乘估计"
 output: html_document
 ---
 
 ```{r}
 library(fpp2)
 library(forecast)
+library(extrafont)
+
+# 导入中文字体
+font_import(pattern = "simhei.ttf")  # simhei.ttf是中文字体的文件名，需要将其放在R工作目录下
+
+# 加载字体
+loadfonts(device = "win")
+
+# 设置字体
+Sys.setenv("font.family"="SimHei")
 ```
-
-5.1 线性模型[](https://otexts.com/fppcn/regression-intro.html#regression-intro)
-
-### 简单线性回归[](https://otexts.com/fppcn/regression-intro.html#%E7%AE%80%E5%8D%95%E7%BA%BF%E6%80%A7%E5%9B%9E%E5%BD%92)
-
-最简单的线性回归模型假设被预测变量 y 和单个预测变量 x 之间存在如下线性关系：
-$$
-y_t = \beta_0 + \beta_1 x_t + \varepsilon_t.
-$$
-
-图 [5.1](https://otexts.com/fppcn/regression-intro.html#fig:SLRpop1) 为示例数据在线性模型上的拟合结果。其中，系数 $\beta_0$ 和 $\beta_1$ 分别表示回归线的截距和斜率。截距项 β0 表示当 x=0 时 y 的预测值；斜率 β1 表示当 x 增加一个单位时，y 的平均变化。
-
-![示例数据在简单线性模型上的回归结果。](https://otexts.com/fppcn/fpp_files/figure-html/SLRpop1-1.png)
-
-图 5.1: 示例数据在简单线性模型上的回归结果。
-
-从上图可以看出，观测值并不全部落在回归线上，而是分布在回归线的周围。我们可以这样理解：每个观测值 yt 都包含可解释部分 $\beta_0+\beta_1x_t$ 和随机误差项 $\varepsilon_t$。随机误差项并不意味着错误，而是指观测值与线性模型的偏差。它捕捉到了除 $x_t$ 外其他影响 $y_t$ 的信息。
-
-#### 示例：美国的消费支出[](https://otexts.com/fppcn/regression-intro.html#%E7%A4%BA%E4%BE%8B%E7%BE%8E%E5%9B%BD%E7%9A%84%E6%B6%88%E8%B4%B9%E6%94%AF%E5%87%BA)
-
-图[5.2](https://otexts.com/fppcn/regression-intro.html#fig:ConsInc)展示了1970年第一季度到2016年第三季度之间，美国实际个人消费支出 y 和实际个人可支配收入 x 的季度增长情况。
-
-```{r}
-cbind('消费' = uschange[, "Consumption"],
-      '收入' = uschange[, "Income"]) %>%
-  autoplot(facets = TRUE, colour=TRUE) +
-  ylab("增长率 % ") + xlab("年份") +
-    theme(text = element_text(family = "STHeiti"))
-```
-
-
-图 5.2: 美国实际个人消费支出和实际个人可支配收入的增长情况。
-
-图[5.3](https://otexts.com/fppcn/regression-intro.html#fig:ConsInc2)表明了消费变化与收入变化的散点图，估计的回归线为：$\hat{y}_t=0.55 + 0.28x_t.$（我们在 y 头上加一个‘帽’，表示为 $hat{y}$ ,这表示模型对 y 的预测值。）
-
-```{r}
-uschange %>%
-  as.data.frame() %>%
-  ggplot(aes(x=Income, y=Consumption)) +
-    ylab("季度消费支出变化 %") +
-    xlab("季度收入变化 %") +
-    geom_point() +
-    geom_smooth(method="lm", se=FALSE)+
-    theme(text = element_text())+
-    theme(plot.title = element_text(hjust = 0.5))
-#> `geom_smooth()` using formula 'y ~ x'
-```
-
-![季度消费支出变化与个人收入变化的拟合回归线和散点图。](https://otexts.com/fppcn/fpp_files/figure-html/ConsInc2-1.png)
-
-图 5.3: 季度消费支出变化与个人收入变化的拟合回归线和散点图。
-
-在R中，可以使用 `tslm()` 函数对模型进行估计：
-
-```{r}
-tslm(Consumption ~ Income, data=uschange)
-#>
-#> Call:
-#> tslm(formula = Consumption ~ Income, data = uschange)
-#>
-#> Coefficients:
-#> (Intercept)       Income
-#>       0.545        0.281
-```
-
-在[5.2](https://otexts.com/fppcn/least-squares.html#least-squares)中，我们会详细阐述 `tslm()` 计算参数的原理。
-
-拟合出的回归线斜率为正，反映了收入与消费之间的正相关关系。斜率系数表明，x 每增加一个单位（个人可支配收入增加1个百分点），会导致 y 平均增加0.28 个单位（个人消费支出平均增加0.28 个百分点）。或者说，当 x （个人可支配收入增长百分比）为1时，y（个人消费支出增长百分比）为 0.55+0.28×1=0.83。
-
-截距项即为 x=0 时 y 的值。在本例中，当 x=0（即个人可支配收入没有变化）时，y 的预测值为0.55（个人消费支出平均增加0.55%）。虽然 x=0 时没有意义，但截距项仍然是模型中的非常重要的一部分。假如模型中没有截距项，斜率系数很可能是一个错误的估计值。除非强制要求回归线通过原点，否则模型中应始终包含截距项。下面我们假设模型中总是包含截距项。
-
-### 多元线性回归[](https://otexts.com/fppcn/regression-intro.html#%E5%A4%9A%E5%85%83%E7%BA%BF%E6%80%A7%E5%9B%9E%E5%BD%92)
-
-当预测变量有两个甚至更多时，模型被称为**多元线性回归模型**。多元线性回归模型的一般形式如下：
-$$
-\begin{equation}
-  y_t = \beta_{0} + \beta_{1} x_{1,t} + \beta_{2} x_{2,t} + \cdots + \beta_{k} x_{k,t} + \varepsilon_t,
-  \tag{5.1}
-\end{equation}
-$$
-
-其中，y 是被预测变量， $x_{1},\dots,x_{k}$ 是 k 个预测变量，每个预测变量都必须为数值型变量。系数 $\beta_{1},\dots,\beta_{k}$ 分别衡量了在保持其他所有预测变量不变的情况下，该预测变量对被预测变量的影响程度。因此，系数衡量了对应预测变量对被预测变量的*边际影响*。
-
-#### 示例：美国的消费支出[](https://otexts.com/fppcn/regression-intro.html#%E7%A4%BA%E4%BE%8B%E7%BE%8E%E5%9B%BD%E7%9A%84%E6%B6%88%E8%B4%B9%E6%94%AF%E5%87%BA-1)
-
-图[5.4](https://otexts.com/fppcn/regression-intro.html#fig:MultiPredictors)显示了可用于预测美国消费支出的其他预测变量。这些预测变量包括工业产出和个人储蓄的季度变化百分比，以及失业率的季度变化。由于我们预测消费支出时不仅考虑了个人收入，还考虑了其他预测变量，因此建立多元线性回归模型可能会产生更准确的预测结果。
-
-![1970年第一季度到2016年第三季度之间，工业生产和个人储蓄的季度变化百分比以及失业率的季度变化情况。](https://otexts.com/fppcn/fpp_files/figure-html/MultiPredictors-1.png)
-
-图 5.4: 1970年第一季度到2016年第三季度之间，工业生产和个人储蓄的季度变化百分比以及失业率的季度变化情况。
-
-图[5.5](https://otexts.com/fppcn/regression-intro.html#fig:ScatterMatrix)是五个变量的散点图矩阵。其中，第一列显示了被预测变量（消费）与其他预测变量的关系。该图表明，居民收入与工业生产产值存在正相关关系，与储蓄和失业率存在负相关关系。相关关系的强度由相关系数来表示。其余的散点图和相关系数表明各个预测变量之间的关系。
-
-```{r}
-uschange %>%
-  as.data.frame() %>%
-  GGally::ggpairs()
-```
-
-![美国消费支出和预测变量的散点图矩阵。](https://otexts.com/fppcn/fpp_files/figure-html/ScatterMatrix-1.png)
-
-图 5.5: 美国消费支出和预测变量的散点图矩阵。
-
-### 假设条件[](https://otexts.com/fppcn/regression-intro.html#%E5%81%87%E8%AE%BE%E6%9D%A1%E4%BB%B6)
-
-当我们想要使用线性回归模型（式[(5.1)](https://otexts.com/fppcn/regression-intro.html#eq:lm)）时，需要对变量做出一些基本假设。
-
-首先，我们假设线性模型是对现实情况的合理近似；也就是说，预测变量和被预测变量之间的关系基本满足这个线性方程。
-
-其次，我们对误差项 $(\varepsilon_{1},\dots,\varepsilon_{T})$ 做出如下假设：
-
-- 期望为零；否则预测结果会产生系统性偏差。
-- 随机误差项彼此不相关；否则预测效果会很差，因为这表明数据中尚有很多可用信息没有包含在模型中。
-- 与预测变量不相关；若误差项与预测变量相关，则表明模型的系统部分中应该包含更多信息。
-
-为了方便得到预测区间，我们还需要假设随机误差项服从方差为 $\sigma^2$ 的正态分布。
-
-线性回归模型还有一个重要的假设是预测变量 x 不是随机变量。在进行模拟实验时，我们可以控制每个 x 的值（所以 x 不会是随机的）并观察 y 的结果值。但在实际生活中，我们只能得到观察数据（包括商业和经济学中的大多数数据），而不能控制 x 的值。因此，我们需要做出如上假设。
-
-
 ## 5.2 最小二乘估计[](https://otexts.com/fppcn/least-squares.html#least-squares)
 
 在实际问题中，我们有一系列的观察值，但是我们不知道模型系数 $\beta_0,\beta_1, \dots, \beta_k$ 的具体值。因此，我们需要利用模型对这些参数进行估计。
